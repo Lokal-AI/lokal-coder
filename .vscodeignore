@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+out/**
+dist/**.map
+node_modules/**
+src/**
+.gitignore
+.pnpm-lock.yaml
+pnpm-lock.yaml
+tsconfig.json
+esbuild.js
+.vscodeignore
+/ai-coder.vsix
+webview/**
+.env

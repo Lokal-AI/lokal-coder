@@ -1,0 +1,261 @@
+{
+  "name": "lokal-coder",
+  "displayName": "Lokal Coder Agent",
+  "description": "A premium, high-fidelity AI agent studio for VS Code.",
+  "version": "0.1.0",
+  "publisher": "rishabh-tiwari",
+  "author": {
+    "name": "Rishabh Tiwari",
+    "email": "rishabh.tiwari0504@gmail.com"
+  },
+  "icon": "resources/logo.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lokal-coder/vs-code-agent"
+  },
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Testing",
+    "AI"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "lokal-coder-sidebar",
+          "name": "Chat",
+          "icon": "resources/logo.png",
+          "visibility": "visible",
+          "order": 1
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "lokal-coder.startChat",
+        "title": "Lokal Coder: Focus Chat View",
+        "category": "Lokal Coder",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "lokal-coder.clearHistory",
+        "title": "Lokal Coder: Clear Chat History",
+        "category": "Lokal Coder",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "lokal-coder.clearHistory",
+          "group": "navigation",
+          "when": "view == lokal-coder-sidebar"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Lokal Coder Agent",
+      "properties": {
+        "lokal-coder.apiBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434/v1",
+          "description": "OpenAI-compatible API base URL (e.g. Ollama: http://127.0.0.1:11434/v1)."
+        },
+        "lokal-coder.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Secure API key for LLM authentication.",
+          "scope": "application"
+        },
+        "lokal-coder.supportModel": {
+          "type": "string",
+          "default": "gemma3:4b",
+          "description": "Model used for Fast Plan mode default."
+        },
+        "lokal-coder.chatMaxTokens": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 0,
+          "description": "Max new tokens for Fast Plan mode. 0 = server default."
+        },
+        "lokal-coder.codingExtensions": {
+          "type": "array",
+          "default": [
+            ".ts",
+            ".tsx",
+            ".js",
+            ".mjs",
+            ".jsx",
+            ".html",
+            ".css",
+            ".scss",
+            ".less",
+            ".java",
+            ".kt",
+            ".kts",
+            ".gradle",
+            ".properties",
+            ".xml",
+            ".py",
+            ".pyi",
+            ".ipynb",
+            ".requirements.txt",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".csproj",
+            ".sln",
+            ".rs",
+            ".go",
+            ".mod",
+            ".sum",
+            ".rb",
+            ".gemfile",
+            ".php",
+            ".swift",
+            ".m",
+            ".dart",
+            ".sql",
+            ".prisma",
+            ".sh",
+            ".bat",
+            ".ps1",
+            ".dockerfile",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".md"
+          ],
+          "description": "Allowed extensions in @mention file list."
+        },
+        "lokal-coder.defaultExclusions": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            "dist",
+            "build",
+            "venv",
+            ".venv",
+            "env",
+            "__pycache__",
+            "target",
+            "bin",
+            "obj",
+            ".git",
+            ".svn",
+            ".DS_Store",
+            "Thumbs.db",
+            ".next",
+            ".nuxt",
+            "out",
+            ".antigravity",
+            ".cache",
+            ".nyc_output",
+            "coverage",
+            "tmp",
+            "temp",
+            "vendor"
+          ],
+          "description": "Standard folders and files to exclude from AI context (Side Guard)."
+        },
+        "lokal-coder.contextMaxFileChars": {
+          "type": "number",
+          "default": 32000,
+          "minimum": 2000,
+          "description": "Max characters of active file injected into ASK/PLAN context (head+tail if exceeded)."
+        },
+        "lokal-coder.contextMaxProjectMapChars": {
+          "type": "number",
+          "default": 12000,
+          "minimum": 500,
+          "description": "Max characters of project tree in ASK/PLAN context."
+        },
+        "lokal-coder.enableChatPersistence": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true and Supabase URL + service role key are set, chat is saved per workspace folder."
+        },
+        "lokal-coder.supabaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:54321",
+          "description": "Supabase project URL (local: http://127.0.0.1:54321)."
+        },
+        "lokal-coder.supabaseServiceRoleKey": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase service_role key (extension host only; never commit).",
+          "scope": "machine"
+        },
+        "lokal-coder.supabaseAnonKey": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase anon/publishable key (safe for webview)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run build",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "vsce package --no-dependencies",
+    "vsix": "vsce package --no-dependencies --out lokal-coder.vsix",
+    "publish": "vsce publish",
+    "lint": "eslint src && pnpm -C webview run lint",
+    "format": "prettier --write .",
+    "build": "node esbuild.js --minify && pnpm -C webview run build",
+    "build-webview": "pnpm -C webview run build",
+    "release:local": "pnpm run vsix && code --install-extension lokal-coder.vsix",
+    "uninstall:local": "code --uninstall-extension rishabh-tiwari.lokal-coder",
+    "release:anti-local": "pnpm run vsix && antigravity --install-extension lokal-coder.vsix",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.5",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.98.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.20.0",
+    "eslint": "^10.1.0",
+    "glob": "^10.3.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "semantic-release": "^25.0.3",
+    "typescript": "^5.1.6",
+    "typescript-eslint": "^8.58.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "openai": "^6.33.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,css,scss}": [
+      "prettier --write"
+    ],
+    "src/**/*.ts": [
+      "eslint --fix"
+    ],
+    "webview/src/**/*.{ts,tsx}": [
+      "pnpm -C webview run lint --fix"
+    ]
+  }
+}

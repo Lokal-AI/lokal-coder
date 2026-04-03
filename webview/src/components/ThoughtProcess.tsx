@@ -1,0 +1,75 @@
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Sparkles } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Markdown } from "./common/Markdown";
+
+interface ThoughtProcessProps {
+  content: string;
+  isThinking: boolean;
+}
+
+export const ThoughtProcess: React.FC<ThoughtProcessProps> = ({ content, isThinking }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (isThinking) {
+      interval = setInterval(() => {
+        setSeconds((s) => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isThinking]);
+
+  if (!content && !isThinking) return null;
+
+  return (
+    <div className="flex flex-col mb-3 select-none">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 w-fit rounded-lg px-2 py-1.5 -ml-1
+          hover:bg-[var(--vscode-toolbar-hoverBackground,rgba(255,255,255,0.06))] transition-colors text-left"
+      >
+        <Sparkles
+          size={12}
+          className="shrink-0 opacity-50"
+          style={{ color: "var(--chat-muted)" }}
+        />
+        <span
+          className="text-[11px] font-medium flex items-center gap-1.5"
+          style={{ color: "var(--chat-muted)" }}
+        >
+          <motion.span
+            animate={{ rotate: isOpen ? 0 : -90 }}
+            transition={{ duration: 0.2 }}
+            className="inline-flex"
+          >
+            <ChevronDown size={12} strokeWidth={2} />
+          </motion.span>
+          {isThinking ? "Thinking…" : `Thought (${seconds}s)`}
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden mt-1 rounded-lg border border-[var(--chat-composer-border)] bg-[var(--vscode-textBlockQuote-background,rgba(0,0,0,0.2))] px-3 py-2"
+          >
+            <div
+              className="text-[11px] leading-relaxed italic opacity-90 prose-compact"
+              style={{ color: "var(--chat-muted)" }}
+            >
+              <Markdown content={content} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-webview/
+out/
+*.vsix
+
+# VS Code specific
+.vscode-test/
+.history/
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+
+# Large files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

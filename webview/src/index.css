@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* VS Code Theme Integration */
+  --bg-primary: var(--vscode-sideBar-background);
+  --bg-secondary: var(--vscode-editor-background);
+  --border-color: var(--vscode-sideBar-border);
+  --text-primary: var(--vscode-editor-foreground);
+  --text-secondary: var(--vscode-descriptionForeground);
+  --accent-color: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+
+  /* Premium Composer Surfaces */
+  --chat-composer-bg: var(--vscode-input-background, rgba(30, 30, 30, 0.45));
+  --chat-composer-border: var(--vscode-input-border, rgba(255, 255, 255, 0.08));
+  --chat-composer-focus-border: var(--vscode-focusBorder, #4d90fe);
+  --chat-composer-focus-glow: rgba(77, 144, 254, 0.12);
+
+  --chat-user-bg: var(--vscode-input-background, rgba(255, 255, 255, 0.06));
+  --chat-muted: var(--vscode-descriptionForeground, rgba(180, 190, 200, 0.7));
+  --chat-max-width: min(720px, 100%);
+  --agent-accent: var(--vscode-textLink-foreground, #3794ff);
+  --chat-assistant-surface: var(--vscode-editor-background, rgba(255, 255, 255, 0.02));
+  --chat-header-bg: color-mix(
+    in srgb,
+    var(--vscode-sideBar-background) 92%,
+    var(--vscode-widget-border, #333) 8%
+  );
+
+  /* Dropdown & Glassmorphism */
+  --glass-bg: rgba(25, 25, 25, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: blur(12px);
+}
+
+.agent-message-accent {
+  border-left: 3px solid var(--agent-accent);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 250px;
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(
+    --vscode-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+/* Scrollbar — high-contrast, easy to grab (sidebar / narrow panels) */
+::-webkit-scrollbar {
+  width: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--vscode-scrollbar-shadow, rgba(0, 0, 0, 0.15));
+  border-left: 1px solid var(--chat-composer-border, rgba(255, 255, 255, 0.06));
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--vscode-scrollbarSlider-background, rgba(255, 255, 255, 0.22));
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 10px;
+  min-height: 48px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--vscode-scrollbarSlider-hoverBackground, rgba(255, 255, 255, 0.38));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--vscode-scrollbarSlider-activeBackground, rgba(255, 255, 255, 0.45));
+}
+
+/* Scrollable regions in the webview */
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}
+
+textarea:focus {
+  outline: none;
+}
+
+textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--chat-muted));
+  opacity: 0.75;
+}
+
+/* Composer focus ring (matches subtle IDE panels) */
+.chat-composer-focus:focus-within {
+  border-color: var(--chat-composer-focus-border) !important;
+  box-shadow:
+    0 0 0 1px var(--chat-composer-focus-border),
+    0 0 12px var(--chat-composer-focus-glow);
+}
+
+.premium-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.antigravity-glass {
+  background: linear-gradient(180deg, rgba(40, 40, 45, 0.85) 0%, rgba(20, 20, 25, 0.95) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.15); /* Top highlight */
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.text-xxs {
+  font-size: 0.625rem; /* 10px */
+}
+
+.text-tiny {
+  font-size: 0.5rem; /* 8px */
+}
