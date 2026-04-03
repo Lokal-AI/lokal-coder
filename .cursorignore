@@ -1,0 +1,95 @@
+# ----------------------------
+# Dependencies
+# ----------------------------
+node_modules/
+venv/
+.env/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ----------------------------
+# Build / Output
+# ----------------------------
+dist/
+build/
+out/
+target/        # Rust
+*.log
+*.tmp
+*.cache
+
+# ----------------------------
+# OS / System Files
+# ----------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Git
+# ----------------------------
+.git/
+.gitignore
+
+# ----------------------------
+# Env / Secrets
+# ----------------------------
+.env*
+*.env
+secrets/
+*.key
+*.pem
+
+# ----------------------------
+# IDE / Editor
+# ----------------------------
+.vscode/
+.idea/
+
+# ----------------------------
+# Lokal Agent Generated Files (IMPORTANT)
+# ----------------------------
+local-agent/plan.md
+local-agent/implementation.md
+local-agent/code-base/
+
+# (optional: if you don’t want agent artifacts indexed)
+# local-agent/
+
+# ----------------------------
+# Logs & Runtime
+# ----------------------------
+logs/
+*.log
+
+# ----------------------------
+# Temporary / Scratch
+# ----------------------------
+tmp/
+temp/
+*.swp
+*.swo
+
+# ----------------------------
+# Large / Binary Files
+# ----------------------------
+*.zip
+*.tar
+*.gz
+*.rar
+*.jpg
+*.png
+*.mp4
+*.mov
+
+# ----------------------------
+# Test Coverage
+# ----------------------------
+coverage/
+.nyc_output/
+
+# ----------------------------
+# Misc
+# ----------------------------
+*.lock

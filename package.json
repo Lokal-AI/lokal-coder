@@ -79,8 +79,8 @@
         },
         "lokal-coder.supportModel": {
           "type": "string",
-          "default": "gemma3:4b",
-          "description": "Model used for Fast Plan mode default."
+          "default": "llama3.1:8b-instruct-q4_K_M",
+          "description": "Layer 0 / fast-path model. Use an Ollama model that supports tools (e.g. Llama 3.1, Qwen2.5-coder); Gemma often does not."
         },
         "lokal-coder.chatMaxTokens": {
           "type": "number",
@@ -145,28 +145,39 @@
           "default": [
             "node_modules",
             "dist",
+            ".dist",
+            "dist-",
             "build",
+            ".build",
+            "out",
+            "bin",
+            "obj",
+            "target",
+            "vendor",
             "venv",
             ".venv",
             "env",
             "__pycache__",
-            "target",
-            "bin",
-            "obj",
+            "lib",
+            "lib64",
+            ".gradle",
+            "gradle.build",
+            ".m2",
+            ".idea",
+            ".vscode",
             ".git",
             ".svn",
-            ".DS_Store",
-            "Thumbs.db",
+            "Pods",
+            ".expo",
             ".next",
             ".nuxt",
-            "out",
-            ".antigravity",
             ".cache",
-            ".nyc_output",
+            ".antigravity",
+            ".lokal-tmp*",
             "coverage",
+            ".nyc_output",
             "tmp",
-            "temp",
-            "vendor"
+            "temp"
           ],
           "description": "Standard folders and files to exclude from AI context (Side Guard)."
         },
@@ -202,6 +213,12 @@
           "type": "string",
           "default": "",
           "description": "Supabase anon/publishable key (safe for webview)."
+        },
+        "lokal-coder.databaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Postgres connection string for LangGraph checkpoints (e.g. Supabase DATABASE_URL). Falls back to in-memory if empty.",
+          "scope": "machine"
         }
       }
     }
@@ -228,6 +245,7 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.6",
     "@semantic-release/npm": "^13.1.5",
+    "@types/pg": "^8.11.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.98.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -244,8 +262,15 @@
     "typescript-eslint": "^8.58.0"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.38",
+    "@langchain/langgraph": "^1.2.6",
+    "@langchain/langgraph-checkpoint": "^1.0.1",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
+    "@langchain/openai": "^1.4.1",
     "@supabase/supabase-js": "^2.101.1",
-    "openai": "^6.33.0"
+    "pg": "^8.13.1",
+    "openai": "^6.33.0",
+    "zod": "^4.3.6"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md,css,scss}": [

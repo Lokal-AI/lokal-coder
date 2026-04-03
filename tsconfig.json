@@ -17,6 +17,7 @@
       "@webview/*": ["src/services/webview/*"],
       "@commands/*": ["src/commands/*"],
       "@lokal-types/*": ["src/types/*"],
+      "@persistence/*": ["src/services/persistence/*"],
       "@/*": ["src/*"]
     },
     "esModuleInterop": true,

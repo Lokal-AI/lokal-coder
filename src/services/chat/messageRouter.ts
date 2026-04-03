@@ -1,11 +1,12 @@
-import * as vscode from "vscode";
-import { ServiceContainer } from "@core/container";
-import { Logger } from "@core/logger";
-import { SendMessagePayload, WebviewMessage } from "@lokal-types/messages";
 import { ChatPersistenceService } from "@chat/chatPersistenceService";
 import { ContextService } from "@chat/contextService";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
 import { FileService } from "@file-service/fileService";
 import { OllamaService } from "@llms/ollamaService";
+import { SendMessagePayload, WebviewMessage } from "@lokal-types/messages";
+import * as vscode from "vscode";
+import { Layer0Agent } from "../agentic/layer0Agent";
 
 export class MessageRouter {
   private logger: Logger;
@@ -18,6 +19,7 @@ export class MessageRouter {
   private persistedSessionId: string | null = null;
   private currentUserId: string | null = null;
   private context: vscode.ExtensionContext;
+  private layer0: Layer0Agent;
 
   public getCurrentUserId(): string | null {
     return this.currentUserId;
@@ -31,6 +33,7 @@ export class MessageRouter {
     this.fileService = container.resolve<FileService>("FileService");
     this.chatPersistence = container.resolve<ChatPersistenceService>("ChatPersistenceService");
     this.context = container.resolve<vscode.ExtensionContext>("Context");
+    this.layer0 = new Layer0Agent();
 
     // Restore persistent identity
     const savedUser = this.context.workspaceState.get<string>("currentUserId");
@@ -124,13 +127,24 @@ export class MessageRouter {
   }
 
   private async handleClearSession(payload: { sessionId: string }, webview: vscode.Webview) {
-    const { sessionId } = payload;
-    this.logger.info(`Cleaning messages for session: ${sessionId}`);
-    await this.chatPersistence.clearMessages(sessionId);
-    if (this.persistedSessionId === sessionId) {
-      await this.handleOnReady(webview);
-    } else {
-      await this.handleListSessions(webview);
+    try {
+      const { sessionId } = payload;
+      this.logger.info(`Cleaning messages for session: ${sessionId}`);
+      await this.chatPersistence.clearMessages(sessionId);
+      if (this.persistedSessionId === sessionId) {
+        await this.handleOnReady(webview);
+      } else {
+        await this.handleListSessions(webview);
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to clear session: ${error.message}`);
+      webview.postMessage({
+        type: "globalError",
+        payload: {
+          message: "Could not clear conversation history.",
+          details: error.message,
+        },
+      });
     }
   }
 
@@ -183,15 +197,45 @@ export class MessageRouter {
     try {
       const enrichedText = await this.resolveMentions(text, mentions);
       this.logger.info(`Enriched prompt generated (${enrichedText.length} chars).`);
-      const config = vscode.workspace.getConfiguration("lokal-coder");
-      const askModel =
-        model?.trim() && model !== "Ollama"
-          ? model
-          : config.get<string>("supportModel", "gemma3:4b");
 
-      await this.streamAskMode(enrichedText, askModel, assistantId, webview, controller.signal);
+      const sessionId = await this.getPersistSessionId();
+
+      const result = await this.layer0.run(
+        enrichedText,
+        sessionId || "default-thread",
+        (chunk) => {
+          this.recordAssistantChunk(assistantId, "content", chunk);
+          webview.postMessage({ type: "streamChunk", id: assistantId, payload: chunk });
+        },
+        (verb, detail) => {
+          webview.postMessage({
+            type: "activityLine",
+            id: assistantId,
+            payload: { verb, detail },
+          });
+        },
+        controller.signal
+      );
+
+      if (result.isActionable) {
+        const msg =
+          "\n\n> [!NOTE]\n> This request has been identified as a **Coding Task**. I am ready to transition to the **Planning Phase** (Layer 1) once the next layer is active.";
+        this.recordAssistantChunk(assistantId, "content", msg);
+        webview.postMessage({ type: "streamChunk", id: assistantId, payload: msg });
+      }
     } catch (_error: any) {
-      /* ignore */
+      if (_error.name === "AbortError") {
+        this.logger.info("Request aborted by user.");
+      } else {
+        this.logger.error(`Error in Layer 0: ${_error.message}`);
+        webview.postMessage({
+          type: "globalError",
+          payload: {
+            message: "The AI model encountered an error during request processing.",
+            details: _error.message,
+          },
+        });
+      }
     } finally {
       this.activeControllers.delete(requestId);
       await this.persistUserTurn(requestId, text, mentions);
@@ -237,47 +281,58 @@ export class MessageRouter {
   }
 
   private async handleSetUser(payload: { userId: string }, webview: vscode.Webview) {
-    const newUserId = payload.userId || null;
-    this.logger.info(`📥 Received setUser message: userId=${newUserId || "NULL"}`);
+    try {
+      const newUserId = payload.userId || null;
+      this.logger.info(`📥 Received setUser message: userId=${newUserId || "NULL"}`);
 
-    if (!newUserId) {
-      this.logger.info("👤 User logout signal: Clearing session state.");
-      this.currentUserId = null;
-      this.persistedSessionId = null;
-      await this.context.workspaceState.update("currentUserId", null);
+      if (!newUserId) {
+        this.logger.info("👤 User logout signal: Clearing session state.");
+        this.currentUserId = null;
+        this.persistedSessionId = null;
+        await this.context.workspaceState.update("currentUserId", null);
 
-      // Clear webview state explicitly
-      webview.postMessage({
-        type: "chatHistory",
-        payload: { messages: [], sessionId: null },
-      });
-      return;
-    }
-
-    // Persist for reloads
-    await this.context.workspaceState.update("currentUserId", newUserId);
-    this.logger.info(`💾 User identity persisted to workspaceState: ${newUserId}`);
-
-    if (this.currentUserId !== newUserId || !this.persistedSessionId) {
-      this.currentUserId = newUserId;
-      this.persistedSessionId = null;
-      this.logger.info(`👤 User sync confirmed: ${newUserId}`);
-
-      // PROACTIVE: Resolve session immediately upon user set
-      const sessionId = await this.getPersistSessionId();
-      if (sessionId) {
-        this.logger.info(`✅ Proactively synced session ${sessionId} for user ${newUserId}`);
+        // Clear webview state explicitly
         webview.postMessage({
           type: "chatHistory",
-          payload: {
-            messages: null,
-            sessionId,
-            workspaceKey: this.chatPersistence.getWorkspaceKey(),
-          },
+          payload: { messages: [], sessionId: null },
         });
+        return;
       }
 
-      await this.handleOnReady(webview);
+      // Persist for reloads
+      await this.context.workspaceState.update("currentUserId", newUserId);
+      this.logger.info(`💾 User identity persisted to workspaceState: ${newUserId}`);
+
+      if (this.currentUserId !== newUserId || !this.persistedSessionId) {
+        this.currentUserId = newUserId;
+        this.persistedSessionId = null;
+        this.logger.info(`👤 User sync confirmed: ${newUserId}`);
+
+        // PROACTIVE: Resolve session immediately upon user set
+        const sessionId = await this.getPersistSessionId();
+        if (sessionId) {
+          this.logger.info(`✅ Proactively synced session ${sessionId} for user ${newUserId}`);
+          webview.postMessage({
+            type: "chatHistory",
+            payload: {
+              messages: null,
+              sessionId,
+              workspaceKey: this.chatPersistence.getWorkspaceKey(),
+            },
+          });
+        }
+
+        await this.handleOnReady(webview);
+      }
+    } catch (error: any) {
+      this.logger.error(`Error in handleSetUser: ${error.message}`);
+      webview.postMessage({
+        type: "globalError",
+        payload: {
+          message: "Failed to establish user session. Please check your Supabase configuration.",
+          details: error.message,
+        },
+      });
     }
   }
 
@@ -345,104 +400,6 @@ export class MessageRouter {
     );
   }
 
-  private async streamAskMode(
-    enrichedText: string,
-    model: string,
-    assistantId: string,
-    webview: vscode.Webview,
-    signal?: AbortSignal
-  ): Promise<void> {
-    const activeContext = await this.contextService.getActiveContext(this.fileService);
-    const contextPrompt = this.contextService.formatContextPrompt(activeContext);
-
-    const fullPrompt = contextPrompt
-      ? `${contextPrompt}\n\nUser Question: ${enrichedText}`
-      : enrichedText;
-    const cfg = vscode.workspace.getConfiguration("lokal-coder");
-    const chatMaxTokens = cfg.get<number>("chatMaxTokens", 4096);
-    const stream = this.ollama.streamChat([{ role: "user", content: fullPrompt }], model, signal, {
-      maxTokens: chatMaxTokens > 0 ? chatMaxTokens : undefined,
-    });
-
-    let isThinking = false;
-    let cumulativeBuffer = "";
-    let sentThinkingActivity = false;
-    const OPEN_TAG = "<redacted_thinking>";
-    const CLOSE_TAG = "</redacted_thinking>";
-
-    for await (const chunk of stream) {
-      cumulativeBuffer += chunk;
-      if (!isThinking && cumulativeBuffer.includes(OPEN_TAG)) {
-        const parts = cumulativeBuffer.split(OPEN_TAG);
-        if (parts[0]) {
-          this.recordAssistantChunk(assistantId, "content", parts[0]);
-          webview.postMessage({ type: "streamChunk", id: assistantId, payload: parts[0] });
-        }
-        isThinking = true;
-        cumulativeBuffer = parts.slice(1).join(OPEN_TAG);
-        if (!sentThinkingActivity) {
-          sentThinkingActivity = true;
-          webview.postMessage({
-            type: "activityLine",
-            id: assistantId,
-            payload: { verb: "Thinking", detail: "Reasoning" },
-          });
-        }
-      }
-      if (isThinking && cumulativeBuffer.includes(CLOSE_TAG)) {
-        const parts = cumulativeBuffer.split(CLOSE_TAG);
-        if (parts[0]) {
-          this.recordAssistantChunk(assistantId, "thought", parts[0]);
-          webview.postMessage({ type: "thoughtChunk", id: assistantId, payload: parts[0] });
-        }
-        isThinking = false;
-        cumulativeBuffer = parts.slice(1).join(CLOSE_TAG);
-        webview.postMessage({
-          type: "activityLine",
-          id: assistantId,
-          payload: { verb: "Analyzing", detail: "Composing answer" },
-        });
-      }
-
-      const potentialTagStart = cumulativeBuffer.lastIndexOf("<");
-      if (potentialTagStart !== -1 && potentialTagStart > cumulativeBuffer.length - 8) {
-        const clearContent = cumulativeBuffer.substring(0, potentialTagStart);
-        if (clearContent) {
-          this.recordAssistantChunk(assistantId, isThinking ? "thought" : "content", clearContent);
-          webview.postMessage({
-            type: isThinking ? "thoughtChunk" : "streamChunk",
-            id: assistantId,
-            payload: clearContent,
-          });
-        }
-        cumulativeBuffer = cumulativeBuffer.substring(potentialTagStart);
-      } else {
-        if (cumulativeBuffer) {
-          this.recordAssistantChunk(
-            assistantId,
-            isThinking ? "thought" : "content",
-            cumulativeBuffer
-          );
-          webview.postMessage({
-            type: isThinking ? "thoughtChunk" : "streamChunk",
-            id: assistantId,
-            payload: cumulativeBuffer,
-          });
-          cumulativeBuffer = "";
-        }
-      }
-    }
-    if (cumulativeBuffer) {
-      const tail = cumulativeBuffer.replace(CLOSE_TAG, "");
-      this.recordAssistantChunk(assistantId, "content", tail);
-      webview.postMessage({
-        type: "streamChunk",
-        id: assistantId,
-        payload: tail,
-      });
-    }
-  }
-
   private async resolveMentions(text: string, mentions?: any[]): Promise<string> {
     let enrichedText = text;
     const processedPaths = new Set<string>();
@@ -500,42 +457,54 @@ export class MessageRouter {
   }
 
   private async handleOnReady(webview: vscode.Webview) {
-    await this.handleListModels(webview);
+    try {
+      await this.handleListModels(webview);
 
-    // If no user is identified, we return an empty state to the webview
-    // This forces the webview to stay on the login page or wait for setUser
-    if (!this.currentUserId) {
-      this.logger.info("Syncing empty history for unauthenticated user.");
-      webview.postMessage({ type: "chatHistory", payload: { messages: [], sessionId: null } });
-      return;
-    }
+      // If no user is identified, we return an empty state to the webview
+      // This forces the webview to stay on the login page or wait for setUser
+      if (!this.currentUserId) {
+        this.logger.info("Syncing empty history for unauthenticated user.");
+        webview.postMessage({ type: "chatHistory", payload: { messages: [], sessionId: null } });
+        return;
+      }
 
-    if (!(await this.chatPersistence.isConfigured())) {
-      webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
-      return;
+      if (!(await this.chatPersistence.isConfigured())) {
+        webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
+        return;
+      }
+      const wk = this.chatPersistence.getWorkspaceKey();
+      if (!wk) {
+        webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
+        return;
+      }
+      const sessionId = await this.chatPersistence.getOrCreateSession(
+        wk,
+        this.currentUserId || undefined
+      );
+      if (!sessionId) {
+        webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
+        return;
+      }
+      this.persistedSessionId = sessionId;
+      const rows = await this.chatPersistence.loadMessages(sessionId);
+      const messages = await Promise.all(
+        rows.map((r) => this.chatPersistence.rowToWebviewMessage(r))
+      );
+      webview.postMessage({
+        type: "chatHistory",
+        payload: { messages, sessionId, workspaceKey: wk },
+      });
+    } catch (error: any) {
+      this.logger.error(`Error in handleOnReady: ${error.message}`);
+      webview.postMessage({
+        type: "globalError",
+        payload: {
+          message:
+            "Failed to initialize chat session. This often happens if the local database is locked or corrupted.",
+          details: error.message,
+        },
+      });
     }
-    const wk = this.chatPersistence.getWorkspaceKey();
-    if (!wk) {
-      webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
-      return;
-    }
-    const sessionId = await this.chatPersistence.getOrCreateSession(
-      wk,
-      this.currentUserId || undefined
-    );
-    if (!sessionId) {
-      webview.postMessage({ type: "chatHistory", payload: { messages: [] } });
-      return;
-    }
-    this.persistedSessionId = sessionId;
-    const rows = await this.chatPersistence.loadMessages(sessionId);
-    const messages = await Promise.all(
-      rows.map((r) => this.chatPersistence.rowToWebviewMessage(r))
-    );
-    webview.postMessage({
-      type: "chatHistory",
-      payload: { messages, sessionId, workspaceKey: wk },
-    });
   }
 
   private async handleListSessions(webview: vscode.Webview) {

@@ -194,9 +194,9 @@ export class FileService {
 
           if (isFile && (type === "file" || type === "all")) {
             const isEnv = name.startsWith(".env");
-            const isCoding = this.isCodingFile(name, codingExts);
+            const isText = this.isTextFile(name, codingExts);
 
-            if (isCoding || isEnv) {
+            if (isText || isEnv) {
               itemsMap.set(name, {
                 id: name,
                 name,
@@ -218,9 +218,9 @@ export class FileService {
 
           const name = relPath.split("/").pop() || relPath;
           const isEnv = name.startsWith(".env");
-          const isCoding = this.isCodingFile(name, codingExts);
+          const isText = this.isTextFile(name, codingExts);
 
-          if ((isCoding || isEnv) && !itemsMap.has(relPath)) {
+          if ((isText || isEnv) && !itemsMap.has(relPath)) {
             itemsMap.set(relPath, {
               id: relPath,
               name,
@@ -238,8 +238,33 @@ export class FileService {
     return Array.from(itemsMap.values());
   }
 
-  private isCodingFile(fileName: string, extensions: string[]): boolean {
+  private isTextFile(fileName: string, extensions: string[]): Promise<boolean> | boolean {
     const lower = fileName.toLowerCase();
+
+    // Explicitly allow common configuration files
+    const configFiles = [
+      "package.json",
+      "tsconfig.json",
+      "jsconfig.json",
+      "webpack.config.js",
+      "next.config.js",
+      "vite.config.ts",
+      "vitest.config.ts",
+      "eslint.config.js",
+      "prettier.config.js",
+      "babel.config.js",
+      "gradle.build",
+      "pom.xml",
+      "gemfile",
+      "dockerfile",
+      ".gitignore",
+      ".dockerignore",
+      "license",
+      "readme",
+    ];
+    if (configFiles.some((cf) => lower.includes(cf))) return true;
+
+    // Standard extension check
     return extensions.some((ext) => lower.endsWith(ext.toLowerCase()));
   }
 

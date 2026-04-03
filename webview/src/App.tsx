@@ -1,5 +1,6 @@
 import { LoginPage } from "@components/auth/LoginPage";
 import { Markdown } from "@components/common/Markdown";
+import { ActivityTimeline } from "@components/ActivityTimeline";
 import { HistoryModal } from "@components/HistoryModal";
 import { InputDock } from "@components/InputDock";
 import { ThoughtProcess } from "@components/ThoughtProcess";
@@ -19,11 +20,17 @@ export default function App() {
     currentSessionId,
     currentWorkspaceKey,
     createSession,
+    globalError,
+    setGlobalError,
   } = useSession();
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const vscode = useVsCodeApi();
+
+  useEffect(() => {
+    console.warn("🎨 App component mounted successfully.");
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,31 +41,79 @@ export default function App() {
     setIsHistoryOpen(true);
   };
 
+  const handleRetry = () => {
+    setGlobalError(null);
+    vscode.postMessage({ command: "onReady" });
+  };
+
+  if (globalError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen px-8 text-center bg-[#0a0a0a]">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 blur-3xl bg-red-500/10 rounded-full animate-pulse" />
+          <div className="relative p-4 rounded-2xl bg-red-500/5 border border-red-500/20">
+            <Activity size={42} className="text-red-500/80" />
+          </div>
+        </div>
+
+        <h2 className="text-base font-black uppercase tracking-[0.2em] text-white mb-3">
+          Application Error
+        </h2>
+
+        <div className="max-w-[280px] space-y-4">
+          <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+            {globalError.message}
+          </p>
+
+          {globalError.details && (
+            <div className="p-3 rounded-lg bg-black/40 border border-white/5 text-left">
+              <span className="block text-[9px] uppercase tracking-widest text-[#444] font-black mb-1">
+                Technical Details
+              </span>
+              <p className="text-[10px] font-mono text-red-400/80 break-words leading-normal">
+                {globalError.details}
+              </p>
+            </div>
+          )}
+
+          <div className="pt-4 flex flex-col gap-2">
+            <button
+              onClick={handleRetry}
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-white text-black text-[11px] font-black uppercase tracking-widest hover:bg-sky-400 transition-colors"
+            >
+              <Activity size={14} />
+              Retry Connection
+            </button>
+
+            <button
+              onClick={() => vscode.postMessage({ command: "openSettings" })}
+              className="text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-wider transition-colors py-2"
+            >
+              Open Settings
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[var(--bg-primary)]">
-        <Activity size={24} className="text-sky-400 animate-spin mb-4" />
-        <span className="text-[10px] uppercase tracking-widest text-[#555] font-black">
-          Connecting...
+      <div className="flex flex-col items-center justify-center h-screen bg-[#020202]">
+        <div className="relative mb-6">
+          <div className="absolute inset-0 blur-2xl bg-sky-500/20 rounded-full animate-pulse" />
+          <Activity size={32} className="text-sky-400 animate-spin relative" />
+        </div>
+        <span className="text-[9px] uppercase tracking-[0.3em] text-white/20 font-black animate-pulse">
+          Initializing Hub
         </span>
       </div>
     );
   }
 
-  if (session === undefined) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen px-6 text-center bg-[var(--bg-primary)]">
-        <Bot size={48} className="text-red-500/40 mb-6" />
-        <h2 className="text-sm font-black uppercase tracking-widest text-white mb-2">
-          Setup Required
-        </h2>
-        <p className="text-[11px] text-slate-500 font-medium leading-relaxed max-w-[200px]">
-          Please configure <code className="text-sky-400">SUPABASE_URL</code> and{" "}
-          <code className="text-sky-400">SUPABASE_ANON_KEY</code> in your{" "}
-          <code className="text-slate-300">.env</code> or extension settings.
-        </p>
-      </div>
-    );
+  // If session is undefined after loading, it means initialization failed or is strictly null
+  if (session === undefined || session === null) {
+    return <LoginPage />;
   }
 
   if (!session) {
@@ -130,9 +185,9 @@ export default function App() {
       <main className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="max-w-[720px] mx-auto py-4 space-y-4">
           <AnimatePresence initial={false}>
-            {messages.map((msg) => (
+            {messages.map((msg, index) => (
               <motion.div
-                key={msg.id}
+                key={`${msg.role}-${String(msg.id)}-${index}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -147,7 +202,10 @@ export default function App() {
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <ThoughtProcess content={msg.thought || ""} isThinking={!!msg.isThinking} />
+                    <div className="space-y-2">
+                      <ThoughtProcess content={msg.thought || ""} />
+                      <ActivityTimeline items={msg.activities || []} streaming={!!msg.isThinking} />
+                    </div>
                   )}
                   <div className="text-[12.5px] leading-relaxed font-medium text-slate-200">
                     <Markdown content={msg.content} />

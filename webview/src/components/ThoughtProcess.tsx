@@ -1,28 +1,17 @@
 import { Markdown } from "@components/common/Markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Sparkles } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 interface ThoughtProcessProps {
   content: string;
-  isThinking: boolean;
 }
 
-export const ThoughtProcess: React.FC<ThoughtProcessProps> = ({ content, isThinking }) => {
+/** Collapsible chain-of-thought text only (no duplicate “Thinking…” — status lives in ActivityTimeline). */
+export const ThoughtProcess: React.FC<ThoughtProcessProps> = ({ content }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [seconds, setSeconds] = useState(0);
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-    if (isThinking) {
-      interval = setInterval(() => {
-        setSeconds((s) => s + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isThinking]);
-
-  if (!content && !isThinking) return null;
+  if (!content?.trim()) return null;
 
   return (
     <div className="flex flex-col mb-3 select-none">
@@ -48,7 +37,7 @@ export const ThoughtProcess: React.FC<ThoughtProcessProps> = ({ content, isThink
           >
             <ChevronDown size={12} strokeWidth={2} />
           </motion.span>
-          {isThinking ? "Thinking…" : `Thought (${seconds}s)`}
+          Thought
         </span>
       </button>
 

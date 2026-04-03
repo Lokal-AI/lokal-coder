@@ -30,7 +30,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this._extensionUri],
+      localResourceRoots: [
+        this._extensionUri,
+        vscode.Uri.joinPath(this._extensionUri, "dist-webview"),
+      ],
     };
 
     webviewView.webview.html = await this._getHtmlForWebview(webviewView.webview);
@@ -51,14 +54,31 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
     );
 
     const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    await config.waitForReady();
     const supabaseUrl = config.getSupabaseUrl();
     const supabaseAnonKey = config.getSupabaseAnonKey();
+
+    // CSP: Allow scripts from local resource roots, styles, and connections.
+    // connect-src MUST allow http and localhost/127.0.0.1 for local Supabase.
+    // We also use webview.asWebviewUri for the base tag.
+    const baseUri = webview.asWebviewUri(this._extensionUri);
+
+    const csp = [
+      `default-src 'none';`,
+      `script-src ${webview.cspSource} 'unsafe-inline' 'unsafe-eval';`,
+      `style-src ${webview.cspSource} 'unsafe-inline' https:;`,
+      `font-src ${webview.cspSource} https:;`,
+      `img-src ${webview.cspSource} https: data:;`,
+      `connect-src ${webview.cspSource} http: https: wss: ws: localhost:* 127.0.0.1:*;`,
+    ].join(" ");
 
     return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+				<meta http-equiv="Content-Security-Policy" content="${csp}">
+				<base href="${baseUri}/">
 				<link rel="stylesheet" type="text/css" href="${styleUri}">
 				<title>Lokal Coder Studio</title>
 				<script>

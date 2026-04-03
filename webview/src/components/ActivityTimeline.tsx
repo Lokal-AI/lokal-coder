@@ -1,8 +1,10 @@
 import {
   Brain,
+  Check,
   ChevronDown,
   Compass,
   FileText,
+  Loader2,
   Map,
   Microscope,
   Pencil,
@@ -19,6 +21,12 @@ export interface ActivityLine {
 
 const verbIcon = (verb: string) => {
   const v = verb.toLowerCase();
+  if (v.includes("classif") || v.includes("intent")) return Brain;
+  if (v.includes("gather") || v.includes("context")) return Compass;
+  if (v.includes("search")) return Microscope;
+  if (v.includes("reason")) return Brain;
+  if (v.includes("draft")) return Pencil;
+  if (v.includes("workspace tool") || v.includes("running tool")) return Terminal;
   if (v.includes("retry")) return Microscope;
   if (v.includes("think")) return Brain;
   if (v.includes("explor") || v.includes("read") || v.includes("map")) return Compass;
@@ -39,7 +47,8 @@ export function ActivityTimeline({
 }) {
   const [manualOpen, setManualOpen] = useState<boolean | null>(null);
 
-  const showAll = manualOpen !== null ? manualOpen : streaming || items.length <= 3;
+  // Default expanded so multi-step runs are visible; collapsed only after user toggles.
+  const showAll = manualOpen !== null ? manualOpen : true;
 
   if (!items.length) return null;
 
@@ -52,11 +61,26 @@ export function ActivityTimeline({
         aria-expanded={showAll}
       >
         <span
-          className="text-[11px] font-semibold uppercase tracking-wide"
+          className="text-[11px] font-semibold uppercase tracking-wide inline-flex items-center gap-2"
           style={{ color: "var(--chat-muted)" }}
         >
-          Agent activity
-          <span className="ml-1.5 font-normal opacity-80">({items.length})</span>
+          {streaming ? (
+            <Loader2
+              size={12}
+              className="shrink-0 animate-spin opacity-90"
+              style={{ color: "var(--vscode-symbolIcon-classForeground, #7dd3fc)" }}
+              aria-hidden
+            />
+          ) : null}
+          <span>
+            Agent activity
+            <span className="ml-1.5 font-normal opacity-80">({items.length})</span>
+            {streaming ? (
+              <span className="ml-2 font-normal normal-case tracking-normal opacity-90 text-[10px]">
+                In progress…
+              </span>
+            ) : null}
+          </span>
         </span>
         <ChevronDown
           size={14}
@@ -67,18 +91,45 @@ export function ActivityTimeline({
       </button>
       {showAll ? (
         <div className="px-2.5 pb-2 pt-0 space-y-1.5">
-          {items.map((line) => {
+          {items.map((line, index) => {
             const Icon = verbIcon(line.verb);
+            const isActive = streaming && index === items.length - 1;
+            const showStepDone = streaming && index < items.length - 1;
             return (
               <div key={line.id} className="flex items-start gap-2 text-[11px] leading-snug">
-                <Icon
-                  size={12}
-                  className="shrink-0 mt-0.5 opacity-70"
-                  style={{ color: "var(--vscode-symbolIcon-classForeground, #7dd3fc)" }}
-                  strokeWidth={2}
-                />
+                <span className="relative shrink-0 mt-0.5 w-3 h-3 flex items-center justify-center">
+                  {isActive ? (
+                    <Loader2
+                      size={12}
+                      className="animate-spin opacity-95"
+                      style={{ color: "var(--vscode-symbolIcon-classForeground, #7dd3fc)" }}
+                      aria-label="In progress"
+                    />
+                  ) : (
+                    <>
+                      <Icon
+                        size={12}
+                        className={streaming ? "opacity-55" : "opacity-70"}
+                        style={{ color: "var(--vscode-symbolIcon-classForeground, #7dd3fc)" }}
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                      {showStepDone ? (
+                        <Check
+                          size={8}
+                          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[var(--bg-primary)] text-emerald-400/90"
+                          strokeWidth={3}
+                          aria-hidden
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </span>
                 <span className="min-w-0">
-                  <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                  <span
+                    className={`font-medium ${isActive ? "text-sky-300/95" : ""}`}
+                    style={!isActive ? { color: "var(--text-primary)" } : undefined}
+                  >
                     {line.verb}
                   </span>
                   {line.detail ? (

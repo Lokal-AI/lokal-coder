@@ -1,15 +1,16 @@
+import { ChatPersistenceService } from "@chat/chatPersistenceService";
+import { ContextService } from "@chat/contextService";
+import { MessageRouter } from "@chat/messageRouter";
+import { registerCommands } from "@commands/registration";
+import { revealLokalCoderChat } from "@commands/revealChat";
+import { ConfigService } from "@config/configService";
+import { FileService } from "@file-service/fileService";
+import { OllamaService } from "@llms/ollamaService";
+import { CheckpointPersistenceService } from "@persistence/checkpointPersistence";
+import { ChatWebviewProvider } from "@webview/webviewProvider";
 import * as vscode from "vscode";
 import { ServiceContainer } from "./core/container";
 import { Logger } from "./core/logger";
-import { MessageRouter } from "@chat/messageRouter";
-import { OllamaService } from "@llms/ollamaService";
-import { FileService } from "@file-service/fileService";
-import { ChatWebviewProvider } from "@webview/webviewProvider";
-import { registerCommands } from "@commands/registration";
-import { revealLokalCoderChat } from "@commands/revealChat";
-import { ContextService } from "@chat/contextService";
-import { ChatPersistenceService } from "@chat/chatPersistenceService";
-import { ConfigService } from "@config/configService";
 
 export async function activate(context: vscode.ExtensionContext) {
   const container = ServiceContainer.getInstance();
@@ -50,6 +51,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const file = new FileService();
   container.register("FileService", file);
+
+  const checkpointPersistence = new CheckpointPersistenceService(logger, configService);
+  try {
+    await checkpointPersistence.initialize();
+    container.register("CheckpointPersistenceService", checkpointPersistence);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(`Critical: Checkpoint persistence failed to initialize: ${message}`);
+    container.register("CheckpointPersistenceService", checkpointPersistence);
+  }
 
   const chatPersistence = new ChatPersistenceService(logger);
   container.register("ChatPersistenceService", chatPersistence);
@@ -96,8 +107,17 @@ export async function activate(context: vscode.ExtensionContext) {
   logger.info("Lokal Coder Agent Activation successful. ✨");
 }
 
-export function deactivate() {
-  const logger = ServiceContainer.getInstance().resolve<Logger>("Logger");
+export async function deactivate() {
+  const container = ServiceContainer.getInstance();
+  try {
+    const checkpoints = container.resolve<CheckpointPersistenceService>(
+      "CheckpointPersistenceService"
+    );
+    await checkpoints.dispose();
+  } catch {
+    /* not registered */
+  }
+  const logger = container.resolve<Logger>("Logger");
   logger.info("Deactivating Lokal Coder Agent Extension...");
   logger.dispose();
 }

@@ -14,7 +14,8 @@ export class OllamaService {
   private createClient(): OpenAI {
     const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
     const baseURL = config.getOllamaBaseUrl();
-    const apiKey = config.getOllamaApiKey();
+    // OpenAI SDK requires a non-empty apiKey; Ollama does not validate it.
+    const apiKey = config.getOllamaApiKey().trim() || "ollama";
 
     this.logger.info(`OpenAI-compatible client baseURL: ${baseURL}`);
     return new OpenAI({

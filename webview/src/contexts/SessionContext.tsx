@@ -31,6 +31,18 @@ export const WELCOME_MESSAGE: Message = {
     "**Lokal Coder** is ready.\n\n- **Fast Plan** — quick implementation advice and structured code planning with full model choice.",
 };
 
+/** Merge stream/activity updates into the correct assistant row (not always last: e.g. after user bubble). */
+function findLastAssistantIndex(messages: Message[], assistantId: string | number): number {
+  const sid = String(assistantId);
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === "assistant" && String(m.id) === sid) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 interface SessionContextType {
   session: any | null;
   user: any | null;
@@ -45,49 +57,84 @@ interface SessionContextType {
   currentWorkspaceKey: string | null;
   loadSession: (sessionId: string) => void;
   createSession: () => void;
+
+  // Error State
+  globalError: { message: string; details?: string; code?: string } | null;
+  setGlobalError: (error: { message: string; details?: string; code?: string } | null) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<any | null | undefined>(supabase ? null : undefined);
-  const [isLoading, setIsLoading] = useState(!!supabase);
+  // No Supabase: stay logged out without syncing state inside an effect (avoids sync setState in effects).
+  const [session, setSession] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(() => Boolean(supabase));
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentWorkspaceKey, setCurrentWorkspaceKey] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<{
+    message: string;
+    details?: string;
+    code?: string;
+  } | null>(null);
 
   const vscode = useVsCodeApi();
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn("⚠️ Supabase client is not initialized (check your .env/settings).");
+      return;
+    }
 
-    // Initial session check
-    supabase?.auth
-      .getSession()
-      .then(({ data: { session } }: { data: { session: any } }) => {
-        console.warn("🔑 Initial session check:", session?.user?.id || "No user");
-        setSession(session);
-        if (session?.user?.id) {
-          vscode.postMessage({ command: "setUser", payload: { userId: session.user.id } });
-        }
+    // Initial session check with 2s strict timeout to prevent blank screen hangs
+    let checkFinished = false;
+    const timeout = setTimeout(() => {
+      if (!checkFinished) {
+        console.warn("⏳ Initial session check timed out. Defaulting to Login/Error.");
         setIsLoading(false);
+      }
+    }, 2000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: initial } }: { data: { session: any } }) => {
+        checkFinished = true;
+        console.warn("🔑 Initial session check:", initial?.user?.id || "No user");
+        setSession(initial);
+        if (initial?.user?.id) {
+          vscode.postMessage({ command: "setUser", payload: { userId: initial.user.id } });
+        }
       })
       .catch((err: any) => {
+        checkFinished = true;
         console.error("❌ Initial session check failed:", err);
+        setSession(null);
+      })
+      .finally(() => {
+        clearTimeout(timeout);
         setIsLoading(false);
       });
 
-    // Listen for auth changes
-    const authSubscription = supabase?.auth.onAuthStateChange((event: string, session: any) => {
-      console.warn(`🔐 Auth state change [${event}]:`, session?.user?.id || "No user");
-      setSession(session);
-      // Always sync with extension, even if session is null (logout)
-      vscode.postMessage({ command: "setUser", payload: { userId: session?.user?.id || null } });
-      setIsLoading(false);
+    const authSubscription = supabase.auth.onAuthStateChange((event: string, nextSession: any) => {
+      console.warn(`🔐 Auth state change [${event}]:`, nextSession?.user?.id || "No user");
+      setSession(nextSession);
+      vscode.postMessage({
+        command: "setUser",
+        payload: { userId: nextSession?.user?.id || null },
+      });
+      if (nextSession) setIsLoading(false);
     });
 
-    return () => authSubscription?.data.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      authSubscription.data.subscription.unsubscribe();
+    };
+  }, [vscode]);
+
+  useEffect(() => {
+    // Notify extension we are ready to receive initial state
+    vscode.postMessage({ command: "onReady" });
   }, [vscode]);
 
   useEffect(() => {
@@ -124,11 +171,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         case "thoughtChunk":
           setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant" && last.id === message.id) {
+            const idx = findLastAssistantIndex(prev, message.id);
+            if (idx >= 0) {
+              const row = prev[idx];
               return [
-                ...prev.slice(0, -1),
-                { ...last, thought: (last.thought || "") + message.payload, isThinking: true },
+                ...prev.slice(0, idx),
+                {
+                  ...row,
+                  thought: (row.thought || "") + message.payload,
+                  isThinking: true,
+                },
+                ...prev.slice(idx + 1),
               ];
             }
             return [
@@ -146,22 +199,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         case "streamChunk":
           setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant" && last.id === message.id) {
+            const idx = findLastAssistantIndex(prev, message.id);
+            const chunk = typeof message.payload === "string" ? message.payload : "";
+            if (idx >= 0) {
+              const row = prev[idx];
               return [
-                ...prev.slice(0, -1),
-                { ...last, content: last.content + message.payload, isThinking: false },
+                ...prev.slice(0, idx),
+                {
+                  ...row,
+                  content: (row.content || "") + chunk,
+                  // Keep true until streamEnd so the timeline spinner shows during tools + reply.
+                  isThinking: true,
+                },
+                ...prev.slice(idx + 1),
               ];
             }
             return [
               ...prev,
-              { id: message.id, role: "assistant", content: message.payload, isThinking: false },
+              {
+                id: message.id,
+                role: "assistant",
+                content: chunk,
+                isThinking: true,
+              },
             ];
           });
           break;
 
         case "streamEnd":
-          // Handle logic if needed
+          setMessages((prev: Message[]) => {
+            const id = message.id as string | number | undefined;
+            if (id === undefined) return prev;
+            const idx = findLastAssistantIndex(prev, id);
+            if (idx < 0) return prev;
+            const row = prev[idx];
+            return [...prev.slice(0, idx), { ...row, isThinking: false }, ...prev.slice(idx + 1)];
+          });
           break;
 
         case "streamError":
@@ -171,18 +244,51 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           ]);
           break;
 
-        case "activityLine":
+        case "activityLine": {
+          const assistantId = message.id as string | number;
+          const raw = message.payload;
+          const p =
+            raw && typeof raw === "object" && !Array.isArray(raw)
+              ? (raw as { verb?: unknown; detail?: unknown })
+              : {};
+          const verb = typeof p.verb === "string" ? p.verb : "Activity";
+          const detail = typeof p.detail === "string" ? p.detail : undefined;
+          const line = {
+            verb,
+            detail,
+            id: `${String(assistantId)}-act-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          };
           setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.id === message.id) {
-              const activities = [
-                ...(last.activities || []),
-                { ...message.payload, id: Math.random().toString() },
+            const idx = findLastAssistantIndex(prev, assistantId);
+            if (idx >= 0) {
+              const target = prev[idx];
+              return [
+                ...prev.slice(0, idx),
+                {
+                  ...target,
+                  activities: [...(target.activities || []), line],
+                },
+                ...prev.slice(idx + 1),
               ];
-              return [...prev.slice(0, -1), { ...last, activities }];
             }
-            return prev;
+            return [
+              ...prev,
+              {
+                id: assistantId,
+                role: "assistant" as const,
+                content: "",
+                isThinking: true,
+                activities: [line],
+              },
+            ];
           });
+          break;
+        }
+
+        case "globalError":
+          console.error("🚫 Global Error received:", message.payload);
+          setGlobalError(message.payload);
+          setIsLoading(false);
           break;
       }
     };
@@ -222,6 +328,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         currentWorkspaceKey,
         loadSession,
         createSession,
+        globalError,
+        setGlobalError,
       }}
     >
       {children}
