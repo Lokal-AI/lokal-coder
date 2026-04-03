@@ -1,4 +1,5 @@
 export type WebviewCommand =
+  | "reload"
   | "onReady"
   | "listModels"
   | "sendMessage"

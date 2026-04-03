@@ -1,3 +1,4 @@
+import { Logger } from "@core/logger";
 import { MessageRouter } from "@chat/messageRouter";
 import { ServiceContainer } from "@core/container";
 import { WebviewMessage } from "@lokal-types/messages";
@@ -7,13 +8,26 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "lokal-coder-sidebar";
   private static _instance?: ChatWebviewProvider;
   private _view?: vscode.WebviewView;
+  private logger: Logger;
 
   constructor(private readonly _extensionUri: vscode.Uri) {
+    this.logger = ServiceContainer.getInstance().resolve<Logger>("Logger");
     ChatWebviewProvider._instance = this;
   }
 
   public static postToWebview(message: unknown): void {
     ChatWebviewProvider._instance?._view?.webview.postMessage(message);
+  }
+
+  public static async refresh(): Promise<void> {
+    await ChatWebviewProvider._instance?.refresh();
+  }
+
+  public async refresh(): Promise<void> {
+    if (this._view) {
+      this.logger.info("Refreshing webview UI...");
+      this._view.webview.html = await this._getHtmlForWebview(this._view.webview);
+    }
   }
 
   public async resolveWebviewView(

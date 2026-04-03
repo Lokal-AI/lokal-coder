@@ -101,6 +101,9 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(
         `Scanner found ${items.length} items. Check Developer Console!`
       );
+    }),
+    vscode.commands.registerCommand("lokal-coder.reloadWebview", async () => {
+      await ChatWebviewProvider.refresh();
     })
   );
 

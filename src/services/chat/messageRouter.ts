@@ -5,6 +5,7 @@ import { Logger } from "@core/logger";
 import { FileService } from "@file-service/fileService";
 import { OllamaService } from "@llms/ollamaService";
 import { SendMessagePayload, WebviewMessage } from "@lokal-types/messages";
+import { ChatWebviewProvider } from "@webview/webviewProvider";
 import * as vscode from "vscode";
 import { Layer0Agent } from "../agentic/layer0Agent";
 
@@ -47,6 +48,10 @@ export class MessageRouter {
     this.logger.info(`Message received from webview: ${message.command}`);
 
     switch (message.command) {
+      case "reload":
+        await ChatWebviewProvider.refresh();
+        break;
+
       case "onReady":
         await this.handleOnReady(webview);
         break;

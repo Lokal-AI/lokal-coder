@@ -53,11 +53,11 @@ export function ActivityTimeline({
   if (!items.length) return null;
 
   return (
-    <div className="mb-3 rounded-lg border border-[var(--chat-composer-border)] bg-[var(--vscode-textBlockQuote-background,rgba(255,255,255,0.03))] overflow-hidden">
+    <div className="mb-3 overflow-hidden">
       <button
         type="button"
         onClick={() => setManualOpen(!showAll)}
-        className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-[var(--vscode-toolbar-hoverBackground,rgba(255,255,255,0.04))] transition-colors"
+        className="flex w-full items-center gap-2 py-1.5 text-left transition-colors"
         aria-expanded={showAll}
       >
         <span
@@ -72,31 +72,33 @@ export function ActivityTimeline({
               aria-hidden
             />
           ) : null}
-          <span>
-            Agent activity
-            <span className="ml-1.5 font-normal opacity-80">({items.length})</span>
-            {streaming ? (
-              <span className="ml-2 font-normal normal-case tracking-normal opacity-90 text-[10px]">
-                In progress…
-              </span>
-            ) : null}
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-center">
+              Agent activity
+              <span className="ml-1 font-normal opacity-70">({items.length})</span>
+              {streaming ? (
+                <span className="ml-2 font-normal normal-case tracking-normal opacity-90 text-[10px]">
+                  In progress…
+                </span>
+              ) : null}
+            </span>
+            <ChevronDown
+              size={13}
+              className={`shrink-0 opacity-70 transition-transform ${showAll ? "rotate-180" : ""}`}
+              style={{ color: "var(--chat-muted)" }}
+              strokeWidth={2.5}
+            />
           </span>
         </span>
-        <ChevronDown
-          size={14}
-          className={`shrink-0 opacity-70 transition-transform ${showAll ? "rotate-180" : ""}`}
-          style={{ color: "var(--chat-muted)" }}
-          strokeWidth={2}
-        />
       </button>
       {showAll ? (
-        <div className="px-2.5 pb-2 pt-0 space-y-1.5">
+        <div className="pb-2 pt-0 space-y-1.5">
           {items.map((line, index) => {
             const Icon = verbIcon(line.verb);
             const isActive = streaming && index === items.length - 1;
             const showStepDone = streaming && index < items.length - 1;
             return (
-              <div key={line.id} className="flex items-start gap-2 text-[11px] leading-snug">
+              <div key={line.id} className=" ml-4 flex items-start gap-2 text-[11px] leading-snug">
                 <span className="relative shrink-0 mt-0.5 w-3 h-3 flex items-center justify-center">
                   {isActive ? (
                     <Loader2
@@ -146,10 +148,7 @@ export function ActivityTimeline({
           })}
         </div>
       ) : (
-        <div
-          className="px-2.5 pb-2.5 text-[10px] leading-snug"
-          style={{ color: "var(--chat-muted)" }}
-        >
+        <div className="pb-2.5 text-[10px] leading-snug" style={{ color: "var(--chat-muted)" }}>
           {items.length} steps — expand to view the timeline.
         </div>
       )}

@@ -7,7 +7,7 @@ import { ThoughtProcess } from "@components/ThoughtProcess";
 import { useSession } from "@contexts/SessionContext";
 import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Bot, Clock, LogOut, Plus, Settings } from "lucide-react";
+import { Activity, Bot, Clock, LogOut, Plus, RotateCcw, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function App() {
@@ -140,6 +140,15 @@ export default function App() {
             title="New Chat"
           >
             <Plus size={16} />
+          </button>
+
+          {/* Reload Button */}
+          <button
+            onClick={() => vscode.postMessage({ command: "reload" })}
+            className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-500 hover:text-emerald-400 transition-all group"
+            title="Reload UI"
+          >
+            <RotateCcw size={16} className="group-hover:rotate-[-45deg] transition-transform" />
           </button>
 
           {/* History Button */}
