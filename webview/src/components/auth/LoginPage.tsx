@@ -1,7 +1,8 @@
+import logo from "@/assets/logo.png";
+import { supabase } from "@lib/supabase";
 import { motion } from "framer-motion";
-import { ArrowRight, Github, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Github, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import React, { useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 interface LoginPageProps {
   onSuccess?: () => void;
@@ -20,13 +21,16 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     setError(null);
 
     try {
+      const auth = supabase?.auth;
+      if (!auth) {
+        throw new Error("Supabase is not configured. Please check your extension settings.");
+      }
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await auth.signUp({ email, password });
         if (error) throw error;
-        // Supabase might require email confirmation, typically handled by message
         setError("Check your email for confirmation!");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await auth.signInWithPassword({ email, password });
         if (error) throw error;
         onSuccess?.();
       }
@@ -39,7 +43,11 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
   const socialLogin = async (provider: "github" | "google") => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      const auth = supabase?.auth;
+      if (!auth) {
+        throw new Error("Supabase is not configured. Please check your extension settings.");
+      }
+      const { error } = await auth.signInWithOAuth({ provider });
       if (error) throw error;
     } catch (err: any) {
       setError(err.message);
@@ -47,69 +55,76 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-6 py-12 bg-[var(--vscode-sideBar-background)] overflow-hidden relative">
-      {/* Background Glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-sky-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8 bg-[#020202] overflow-hidden relative selection:bg-white/20">
+      {/* Structural Grain Overlay */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[320px] z-10"
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-[280px] z-10"
       >
-        <div className="flex flex-col items-center mb-8 text-center">
+        <div className="flex flex-col items-center mb-6 text-center">
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-            className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-[0_8px_30px_rgb(14,165,233,0.3)] mb-6 relative group"
+            transition={{ delay: 0.1, duration: 0.8 }}
+            className="mb-4 p-1 border border-white/5 rounded-2xl bg-white/[0.02]"
           >
-            <Sparkles className="text-white w-7 h-7" />
-            <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            {logo ? (
+              <img
+                src={logo}
+                alt="Lokal Coder Logo"
+                className="w-9 h-9 grayscale invert brightness-200 contrast-125 object-contain"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-white/10 animate-pulse" />
+            )}
           </motion.div>
 
-          <h1 className="text-xl font-black tracking-tight text-white mb-2 uppercase italic">
-            Lokal Coder <span className="text-sky-400 not-italic">Studio</span>
+          <h1 className="text-[13px] font-black tracking-[0.25em] text-white mb-1.5 uppercase">
+            Lokal <span className="text-white/40 font-normal">Coder</span>
           </h1>
-          <p className="text-[11px] font-medium text-slate-400 leading-relaxed uppercase tracking-[0.15em] opacity-60">
-            Professional AI Engineering <br /> Workspace
+          <p className="text-[9px] font-medium text-white/30 leading-relaxed uppercase tracking-[0.15em]">
+            Professional AI Engineering <br /> Studio
           </p>
         </div>
 
         <motion.div
           layout
-          className="bg-white/[0.03] border border-white/10 rounded-3xl p-6 shadow-2xl backdrop-blur-xl"
+          className="bg-[#0a0a0a] border border-white/[0.06] rounded-[28px] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.8)]"
         >
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">
-                Email Address
+              <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+                Identity
               </label>
               <div className="relative group">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-sky-400 transition-colors" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20 group-focus-within:text-white transition-colors" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full bg-black/20 border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-[12px] focus:outline-none focus:border-sky-500/40 focus:ring-1 focus:ring-sky-500/20 text-white placeholder:text-slate-600 transition-all font-medium"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-xl py-2 pl-9 pr-3 text-[11px] focus:outline-none focus:border-white/20 focus:ring-0 text-white placeholder:text-white/10 transition-all font-medium"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">
-                Password
+              <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 ml-1">
+                Credentials
               </label>
               <div className="relative group">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20 group-focus-within:text-white transition-colors" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-black/20 border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-[12px] focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 text-white placeholder:text-slate-600 transition-all font-medium"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-xl py-2 pl-9 pr-3 text-[11px] focus:outline-none focus:border-white/20 focus:ring-0 text-white placeholder:text-white/10 transition-all font-medium"
                   required
                 />
               </div>
@@ -117,9 +132,9 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
             {error && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 font-bold text-center"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-2 rounded-xl bg-white/[0.02] border border-white/5 text-[9px] text-white/50 font-medium text-center"
               >
                 {error}
               </motion.div>
@@ -128,14 +143,14 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(14,165,233,0.3)] hover:shadow-[0_4px_25px_rgba(14,165,233,0.5)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none group"
+              className="w-full h-10 bg-white hover:bg-[#eeeeee] text-black rounded-xl font-black text-[10px] uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none shadow-[0_4px_20px_rgba(255,255,255,0.05)]"
             >
               {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <>
-                  <span>{isSignUp ? "Initialize Workspace" : "Enter Studio"}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span>{isSignUp ? "Create Workspace" : "Enter Studio"}</span>
+                  <ArrowRight className="w-3 h-3" />
                 </>
               )}
             </button>
@@ -143,27 +158,27 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
+              <div className="w-full border-t border-white/[0.04]"></div>
             </div>
-            <div className="relative flex justify-center text-[9px] uppercase font-black tracking-widest leading-none bg-transparent">
-              <span className="px-2 text-slate-600">Enterprise Auth</span>
+            <div className="relative flex justify-center text-[7px] uppercase font-black tracking-[0.25em] leading-none bg-transparent">
+              <span className="px-3 text-white/10">External Gateway</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => socialLogin("github")}
-              className="flex items-center justify-center gap-2 h-10 bg-white/[0.04] border border-white/5 rounded-xl hover:bg-white/[0.08] transition-all text-slate-400 hover:text-white"
+              className="flex items-center justify-center gap-2 h-9 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] hover:border-white/10 transition-all text-white/40 hover:text-white group"
             >
-              <Github className="w-4 h-4" />
-              <span className="text-[10px] font-bold">GitHub</span>
+              <Github className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              <span className="text-[9px] font-bold tracking-wider">GitHub</span>
             </button>
             <button
               onClick={() => socialLogin("google")}
-              className="flex items-center justify-center gap-2 h-10 bg-white/[0.04] border border-white/5 rounded-xl hover:bg-white/[0.08] transition-all text-slate-400 hover:text-white"
+              className="flex items-center justify-center gap-2 h-9 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] hover:border-white/10 transition-all text-white/40 hover:text-white group"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span className="text-[10px] font-bold">SSO</span>
+              <ShieldCheck className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              <span className="text-[9px] font-bold tracking-wider">SSO</span>
             </button>
           </div>
         </motion.div>
@@ -171,17 +186,19 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-[11px] font-bold text-slate-500 hover:text-sky-400 transition-colors uppercase tracking-widest"
+            className="text-[9px] font-black text-white/20 hover:text-white transition-colors uppercase tracking-[0.2em]"
           >
-            {isSignUp ? "Already have an account? Login" : "Don't have access? Request Invite"}
+            {isSignUp ? "Return to Login" : "Initialize Fresh Environment"}
           </button>
         </div>
       </motion.div>
 
-      <div className="mt-auto pb-4 text-[9px] text-slate-600 font-bold uppercase tracking-[0.2em] z-10 flex items-center gap-3">
-        <span>v0.1.0-alpha</span>
-        <div className="w-1 h-1 rounded-full bg-sky-500/40" />
-        <span>End-to-End Encrypted</span>
+      <div className="mt-auto pb-4 text-[7px] text-white/10 font-black uppercase tracking-[0.3em] z-10 flex items-center gap-3">
+        <span>EST. MMXXIV</span>
+        <div className="w-0.5 h-0.5 rounded-full bg-white/20" />
+        <span>Hardware Accelerated</span>
+        <div className="w-0.5 h-0.5 rounded-full bg-white/20" />
+        <span>E2E Encryption</span>
       </div>
     </div>
   );

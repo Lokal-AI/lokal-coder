@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useVsCodeApi } from "./useVsCodeApi";
+import { useVsCodeApi } from "@hooks/useVsCodeApi";
+import { useCallback, useEffect, useState } from "react";
 
 interface FetchResult<T> {
   data: T | null;

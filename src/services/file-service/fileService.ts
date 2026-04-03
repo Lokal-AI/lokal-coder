@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { ServiceContainer } from "../core/container";
-import { Logger } from "../core/logger";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
 
 type ItemType = "file" | "folder" | "all";
 

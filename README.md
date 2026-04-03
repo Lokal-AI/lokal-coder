@@ -57,7 +57,7 @@ Our CI/CD pipeline uses the following commit prefixes to determine the next vers
 
 ### Downloading Releases
 
-You can find all official versions, along with their generated changelogs and `.vsix` binaries, on our [Releases](https://github.com/lokal-coder/vs-code-agent/releases) page.
+You can find all official versions, along with their generated changelogs and `.vsix` binaries, on our [Releases](https://github.com/Lokal-AI/lokal-coder/releases) page.
 
 ## 📄 Open Source & Contributions
 

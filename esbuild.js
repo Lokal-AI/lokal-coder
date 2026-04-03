@@ -16,6 +16,13 @@ async function main() {
     platform: "node",
     outfile: "dist/extension.js",
     external: ["vscode"],
+    alias: {
+      "@core": path.resolve(__dirname, "src/core"),
+      "@services": path.resolve(__dirname, "src/services"),
+      "@commands": path.resolve(__dirname, "src/commands"),
+      "@lokal-types": path.resolve(__dirname, "src/types"),
+      "@": path.resolve(__dirname, "src"),
+    },
     logLevel: "silent",
     plugins: [
       /* add to the end of plugins if you want to clean dist before build */

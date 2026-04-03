@@ -1,7 +1,7 @@
+import { MessageRouter } from "@chat/messageRouter";
+import { ServiceContainer } from "@core/container";
+import { WebviewMessage } from "@lokal-types/messages";
 import * as vscode from "vscode";
-import { ServiceContainer } from "../core/container";
-import { MessageRouter } from "./messageRouter";
-import { WebviewMessage } from "../types/messages";
 
 export class ChatWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "lokal-coder-sidebar";
@@ -50,38 +50,9 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, "dist-webview", "assets", "index.css")
     );
 
-    const config = vscode.workspace.getConfiguration("lokal-coder");
-    let supabaseUrl = config.get<string>("supabaseUrl", "");
-    let supabaseAnonKey = config.get<string>("supabaseAnonKey", "");
-
-    const defaultUrl = "http://127.0.0.1:54321";
-
-    // Fallback to .env if config is empty OR if url is the default (allowing override)
-    if (!supabaseUrl || supabaseUrl === defaultUrl || !supabaseAnonKey) {
-      try {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-          const envUri = vscode.Uri.joinPath(workspaceFolders[0].uri, ".env");
-          const envContent = await vscode.workspace.fs.readFile(envUri);
-          const envText = Buffer.from(envContent).toString("utf8");
-
-          // Robust parsing function
-          const getEnvVar = (text: string, key: string) => {
-            const regex = new RegExp(`^\\s*${key}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s#]*))`, "m");
-            const match = text.match(regex);
-            return match ? (match[1] || match[2] || match[3] || "").trim() : null;
-          };
-
-          const eUrl = getEnvVar(envText, "SUPABASE_URL");
-          const eKey = getEnvVar(envText, "SUPABASE_ANON_KEY");
-
-          if (eUrl && !supabaseUrl) supabaseUrl = eUrl;
-          if (eKey && !supabaseAnonKey) supabaseAnonKey = eKey;
-        }
-      } catch (e: any) {
-        console.warn(`Lokal Coder: Failed to read .env file fallback: ${e.message}`);
-      }
-    }
+    const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    const supabaseUrl = config.getSupabaseUrl();
+    const supabaseAnonKey = config.getSupabaseAnonKey();
 
     return `<!DOCTYPE html>
 			<html lang="en">
@@ -92,8 +63,8 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 				<title>Lokal Coder Studio</title>
 				<script>
 					window.LOKAL_CONFIG = {
-						supabaseUrl: "${supabaseUrl}",
-						supabaseAnonKey: "${supabaseAnonKey}"
+						supabaseUrl: "${supabaseUrl || ""}",
+						supabaseAnonKey: "${supabaseAnonKey || ""}"
 					};
 				</script>
 			</head>

@@ -1,16 +1,17 @@
 import * as vscode from "vscode";
 import { ServiceContainer } from "./core/container";
 import { Logger } from "./core/logger";
-import { MessageRouter } from "./services/messageRouter";
-import { OllamaService } from "./services/ollamaService";
-import { FileService } from "./services/fileService";
-import { ChatWebviewProvider } from "./services/webviewProvider";
-import { registerCommands } from "./commands/registration";
-import { revealLokalCoderChat } from "./commands/revealChat";
-import { ContextService } from "./services/contextService";
-import { ChatPersistenceService } from "./services/chatPersistenceService";
+import { MessageRouter } from "@chat/messageRouter";
+import { OllamaService } from "@llms/ollamaService";
+import { FileService } from "@file-service/fileService";
+import { ChatWebviewProvider } from "@webview/webviewProvider";
+import { registerCommands } from "@commands/registration";
+import { revealLokalCoderChat } from "@commands/revealChat";
+import { ContextService } from "@chat/contextService";
+import { ChatPersistenceService } from "@chat/chatPersistenceService";
+import { ConfigService } from "@config/configService";
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   const container = ServiceContainer.getInstance();
 
   // Initialize Core Services
@@ -25,13 +26,18 @@ export function activate(context: vscode.ExtensionContext) {
   container.register("Logger", logger);
   container.register("Context", context);
 
+  const configService = new ConfigService(logger);
+  await configService.waitForReady();
+  container.register("ConfigService", configService);
+
   // Initialize Services (Phase 1 & 2)
   const ollama = new OllamaService();
   container.register("OllamaService", ollama);
 
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration("lokal-coder")) {
+        await configService.refresh();
         ollama.refreshClient();
       }
     })

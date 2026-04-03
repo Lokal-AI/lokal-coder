@@ -1,148 +1,29 @@
+import { LoginPage } from "@components/auth/LoginPage";
+import { Markdown } from "@components/common/Markdown";
+import { HistoryModal } from "@components/HistoryModal";
+import { InputDock } from "@components/InputDock";
+import { ThoughtProcess } from "@components/ThoughtProcess";
+import { useSession } from "@contexts/SessionContext";
+import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Bot, Clock, LogOut, Plus, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ActivityLine } from "./components/ActivityTimeline";
-import { LoginPage } from "./components/auth/LoginPage";
-import { Markdown } from "./components/common/Markdown";
-import { HistoryModal } from "./components/HistoryModal";
-import { InputDock } from "./components/InputDock";
-import { MentionItem } from "./components/MentionMenu";
-import { ThoughtProcess } from "./components/ThoughtProcess";
-import { Trace } from "./components/TraceItem";
-import { useVsCodeApi } from "./hooks/useVsCodeApi";
-
-interface Message {
-  id: string | number;
-  role: "assistant" | "user" | "system";
-  content: string;
-  thought?: string;
-  isThinking?: boolean;
-  mentions?: MentionItem[];
-  diffId?: string;
-  checkpointId?: string;
-  planPath?: string;
-  filePath?: string;
-  isResolved?: boolean;
-  traces?: Trace[];
-  stage?: string;
-  activities?: ActivityLine[];
-  planExecutable?: boolean;
-  errorSummary?: string;
-}
-
-const WELCOME_MESSAGE: Message = {
-  id: "welcome",
-  role: "assistant",
-  content:
-    "**Lokal Coder** is ready.\n\n- **Fast Plan** — quick implementation advice and structured code planning with full model choice.",
-};
-
-import { useSession } from "./contexts/SessionContext";
 
 export default function App() {
-  const { session, isLoading, signOut } = useSession();
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const {
+    session,
+    isLoading,
+    signOut,
+    messages,
+    sessions,
+    currentSessionId,
+    currentWorkspaceKey,
+    createSession,
+  } = useSession();
+
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [currentWorkspaceKey, setCurrentWorkspaceKey] = useState<string | null>(null);
-  const [_assistantId, setAssistantId] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const vscode = useVsCodeApi();
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const message = event.data;
-      console.warn("📬 Webview receiving:", message.type, message.payload);
-
-      switch (message.type) {
-        case "updateMessages":
-          setMessages((prev: Message[]) => [...prev, message.payload]);
-          break;
-
-        case "chatHistory": {
-          const { messages: list, sessionId, workspaceKey } = message.payload || {};
-          if (Array.isArray(list)) {
-            setMessages(list.length > 0 ? (list as Message[]) : [WELCOME_MESSAGE]);
-          }
-          if (sessionId) setCurrentSessionId(sessionId);
-          if (workspaceKey) setCurrentWorkspaceKey(workspaceKey);
-          break;
-        }
-
-        case "sessionsList": {
-          const { sessions: list, currentWorkspaceKey: wk } = message.payload || {};
-          console.warn("📜 sessionsList count:", list?.length, "wk:", wk);
-          if (Array.isArray(list)) setSessions(list);
-          if (wk) setCurrentWorkspaceKey(wk);
-          break;
-        }
-
-        case "resetChat":
-          setMessages([]);
-          setAssistantId(undefined);
-          break;
-
-        case "thoughtChunk":
-          setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant" && last.id === message.id) {
-              return [
-                ...prev.slice(0, -1),
-                { ...last, thought: (last.thought || "") + message.payload, isThinking: true },
-              ];
-            }
-            return [
-              ...prev,
-              {
-                id: message.id,
-                role: "assistant",
-                content: "",
-                thought: message.payload,
-                isThinking: true,
-              },
-            ];
-          });
-          break;
-
-        case "streamChunk":
-          setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant" && last.id === message.id) {
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: last.content + message.payload, isThinking: false },
-              ];
-            }
-            return [
-              ...prev,
-              { id: message.id, role: "assistant", content: message.payload, isThinking: false },
-            ];
-          });
-          break;
-
-        case "streamEnd":
-          setMessages((prev: Message[]) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant" && last.id === message.id) {
-              // Optionally persist turn here or on the backend
-            }
-            return prev;
-          });
-          break;
-
-        case "streamError":
-          setMessages((prev: Message[]) => [
-            ...prev,
-            { id: message.id || Date.now(), role: "system", content: `Error: ${message.payload}` },
-          ]);
-          break;
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [vscode]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -165,7 +46,6 @@ export default function App() {
   }
 
   if (session === undefined) {
-    // This case happens if Supabase is not configured
     return (
       <div className="flex flex-col items-center justify-center h-screen px-6 text-center bg-[var(--bg-primary)]">
         <Bot size={48} className="text-red-500/40 mb-6" />
@@ -200,7 +80,7 @@ export default function App() {
         <div className="flex items-center gap-1">
           {/* New Chat */}
           <button
-            onClick={() => vscode.postMessage({ command: "createSession" })}
+            onClick={createSession}
             className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-500 hover:text-sky-400 transition-all group"
             title="New Chat"
           >

@@ -1,3 +1,8 @@
+import { Menu } from "@components/common/Menu";
+import { MentionItem, MentionMenu } from "@components/MentionMenu";
+import { useFetch } from "@hooks/useFetch";
+import { useStream } from "@hooks/useStream";
+import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -12,11 +17,6 @@ import {
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useFetch } from "../hooks/useFetch";
-import { useStream } from "../hooks/useStream";
-import { useVsCodeApi } from "../hooks/useVsCodeApi";
-import { Menu } from "./common/Menu";
-import { MentionItem, MentionMenu } from "./MentionMenu";
 
 const CATEGORIES: MentionItem[] = [
   { id: "cat-file", name: "Files", type: "category" },
