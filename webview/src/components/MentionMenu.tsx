@@ -1,3 +1,4 @@
+import { Portal } from "@components/common/Portal";
 import { motion } from "framer-motion";
 import {
   Book,
@@ -11,7 +12,6 @@ import {
   Terminal,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { Portal } from "./common/Portal";
 
 export interface MentionItem {
   id: string;

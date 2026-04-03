@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as vscode from "vscode";
-import { Logger } from "../core/logger";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
 
 export interface PersistedMessageRow {
   id: string;
@@ -16,64 +17,22 @@ export interface PersistedMessageRow {
 export class ChatPersistenceService {
   constructor(private logger: Logger) {}
 
-  private async getConfig() {
-    const c = vscode.workspace.getConfiguration("lokal-coder");
-    let url = (c.get<string>("supabaseUrl", "") || "").trim();
-    let key = (c.get<string>("supabaseServiceRoleKey", "") || "").trim();
-
-    // 1. Try to load from .env FIRST
-    try {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (workspaceFolders && workspaceFolders.length > 0) {
-        const envUri = vscode.Uri.joinPath(workspaceFolders[0].uri, ".env");
-        const envContent = await vscode.workspace.fs.readFile(envUri);
-        const text = Buffer.from(envContent).toString("utf8");
-
-        const getEnvVar = (t: string, k: string) => {
-          const r = new RegExp(`^\\s*${k}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s#]*))`, "m");
-          const m = t.match(r);
-          return m ? (m[1] || m[2] || m[3] || "").trim() : null;
-        };
-
-        const eUrl = getEnvVar(text, "SUPABASE_URL");
-        const eKey = getEnvVar(text, "SUPABASE_SERVICE_ROLE_KEY");
-
-        if (eUrl) {
-          url = eUrl;
-          this.logger.info(`🌐 URL override from .env: ${url}`);
-        }
-        if (eKey) {
-          key = eKey;
-          const keyPrefix = key.startsWith("sb_secret")
-            ? "SERVICE_ROLE"
-            : key.startsWith("sb_publishable")
-              ? "ANON"
-              : "UNKNOWN";
-          this.logger.info(`🔐 Key override from .env. Type: ${keyPrefix}`);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // 2. Default fallback if still empty
-    if (!url) url = "http://127.0.0.1:54321";
-
-    const config = {
-      enabled: c.get<boolean>("enableChatPersistence", true),
-      url,
-      key,
+  private getConfig() {
+    const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    return {
+      enabled: config.isConfigured(),
+      url: config.getSupabaseUrl(),
+      key: config.getSupabaseServiceRoleKey(),
     };
-    return config;
   }
 
   public async isConfigured(): Promise<boolean> {
-    const { enabled, url, key } = await this.getConfig();
-    return enabled && Boolean(url) && Boolean(key);
+    const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    return config.isConfigured();
   }
 
   private async client(): Promise<SupabaseClient | null> {
-    const { url, key, enabled } = await this.getConfig();
+    const { url, key, enabled } = this.getConfig();
     if (!enabled || !url || !key) {
       return null;
     }
@@ -87,7 +46,6 @@ export class ChatPersistenceService {
     if (folders && folders.length > 0) {
       return folders[0].uri.fsPath;
     }
-    // Fallback to active editor's folder if any
     const active = vscode.window.activeTextEditor;
     if (active) {
       const folder = vscode.workspace.getWorkspaceFolder(active.document.uri);
@@ -98,9 +56,7 @@ export class ChatPersistenceService {
 
   public async getOrCreateSession(workspaceKey: string, userId?: string): Promise<string | null> {
     if (!userId) {
-      this.logger.error(
-        "Chat persist: Attempted to getOrCreateSession without a userId. Blocking request."
-      );
+      this.logger.error("Chat persist: Attempted to getOrCreateSession without a userId.");
       return null;
     }
 
@@ -108,9 +64,6 @@ export class ChatPersistenceService {
     if (!sb) return null;
 
     const normalizedWk = workspaceKey.replace(/[\\/]$/, "").toLowerCase();
-    this.logger.info(`🔍 getOrCreateSession: normalizedWk=${normalizedWk}, userId=${userId}`);
-
-    // 1. Search for existing session for this user OR an orphaned anonymous session in this workspace
     const { data: rows, error: selErr } = await sb
       .from("chat_sessions")
       .select("id, user_id")
@@ -125,17 +78,12 @@ export class ChatPersistenceService {
 
     if (rows?.length) {
       const existing = rows[0];
-      // 2. ADOPTION: If it was anonymous, claim it for this user
       if (existing.user_id === null) {
-        this.logger.info(
-          `🔄 Session Adoption: Claiming legacy session ${existing.id} for user ${userId}`
-        );
         await sb.from("chat_sessions").update({ user_id: userId }).eq("id", existing.id);
       }
       return existing.id as string;
     }
 
-    // 3. CREATE: No existing/orphaned session found, create fresh
     const { data: ins, error: insErr } = await sb
       .from("chat_sessions")
       .insert({ workspace_key: normalizedWk, title: "Default", user_id: userId })
@@ -168,17 +116,9 @@ export class ChatPersistenceService {
   }
 
   public async listSessions(workspaceKey: string, userId?: string): Promise<any[]> {
-    if (!userId) {
-      this.logger.error(
-        "Chat persist: Attempted to listSessions without a userId. Blocking request."
-      );
-      return [];
-    }
-
+    if (!userId) return [];
     const sb = await this.client();
-    if (!sb) {
-      return [];
-    }
+    if (!sb) return [];
 
     const { data, error } = await sb
       .from("chat_sessions")
@@ -187,33 +127,22 @@ export class ChatPersistenceService {
       .order("updated_at", { ascending: false });
 
     if (error) {
-      this.logger.error(
-        `Chat persist: list sessions error — ${error.message} (code: ${error.code})`
-      );
+      this.logger.error(`Chat persist: list sessions error — ${error.message}`);
       return [];
     }
-
-    this.logger.info(
-      `Chat persist: list — Queried userId: ${userId}. Found ${data?.length || 0} sessions.`
-    );
     return data || [];
   }
 
   public async deleteSession(sessionId: string): Promise<void> {
     const sb = await this.client();
-    if (!sb) {
-      return;
-    }
-    // Messages are deleted by DB cascade if fkeys are set, if not delete manually
+    if (!sb) return;
     await sb.from("chat_messages").delete().eq("session_id", sessionId);
     await sb.from("chat_sessions").delete().eq("id", sessionId);
   }
 
   private async touchSession(sessionId: string): Promise<void> {
     const sb = await this.client();
-    if (!sb) {
-      return;
-    }
+    if (!sb) return;
     await sb
       .from("chat_sessions")
       .update({ updated_at: new Date().toISOString() })
@@ -222,9 +151,7 @@ export class ChatPersistenceService {
 
   public async loadMessages(sessionId: string): Promise<PersistedMessageRow[]> {
     const sb = await this.client();
-    if (!sb) {
-      return [];
-    }
+    if (!sb) return [];
     const { data, error } = await sb
       .from("chat_messages")
       .select("*")
@@ -245,11 +172,8 @@ export class ChatPersistenceService {
     clientMessageId?: string
   ): Promise<void> {
     const sb = await this.client();
-    if (!sb) {
-      return;
-    }
+    if (!sb) return;
 
-    // Auto-title if "Default", null, or empty and it's a user message
     if (role === "user" && content.trim().length > 0) {
       const { data: session } = await sb
         .from("chat_sessions")
@@ -283,13 +207,8 @@ export class ChatPersistenceService {
 
   public async clearMessages(sessionId: string): Promise<void> {
     const sb = await this.client();
-    if (!sb) {
-      return;
-    }
-    const { error } = await sb.from("chat_messages").delete().eq("session_id", sessionId);
-    if (error) {
-      this.logger.error(`Chat persist: clear — ${error.message}`);
-    }
+    if (!sb) return;
+    await sb.from("chat_messages").delete().eq("session_id", sessionId);
     await this.touchSession(sessionId);
   }
 

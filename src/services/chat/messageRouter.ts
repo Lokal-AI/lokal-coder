@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
-import { ServiceContainer } from "../core/container";
-import { Logger } from "../core/logger";
-import { OllamaService } from "./ollamaService";
-import { WebviewMessage, SendMessagePayload } from "../types/messages";
-import { ContextService } from "./contextService";
-import { FileService } from "./fileService";
-import { ChatPersistenceService } from "./chatPersistenceService";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
+import { SendMessagePayload, WebviewMessage } from "@lokal-types/messages";
+import { ChatPersistenceService } from "@chat/chatPersistenceService";
+import { ContextService } from "@chat/contextService";
+import { FileService } from "@file-service/fileService";
+import { OllamaService } from "@llms/ollamaService";
 
 export class MessageRouter {
   private logger: Logger;
@@ -18,6 +18,10 @@ export class MessageRouter {
   private persistedSessionId: string | null = null;
   private currentUserId: string | null = null;
   private context: vscode.ExtensionContext;
+
+  public getCurrentUserId(): string | null {
+    return this.currentUserId;
+  }
 
   constructor() {
     const container = ServiceContainer.getInstance();
@@ -110,8 +114,23 @@ export class MessageRouter {
         await this.handleDeleteSession(message.payload as { sessionId: string }, webview);
         break;
 
+      case "clearSession":
+        await this.handleClearSession(message.payload as { sessionId: string }, webview);
+        break;
+
       default:
         this.logger.error(`Unknown command received: ${message.command}`);
+    }
+  }
+
+  private async handleClearSession(payload: { sessionId: string }, webview: vscode.Webview) {
+    const { sessionId } = payload;
+    this.logger.info(`Cleaning messages for session: ${sessionId}`);
+    await this.chatPersistence.clearMessages(sessionId);
+    if (this.persistedSessionId === sessionId) {
+      await this.handleOnReady(webview);
+    } else {
+      await this.handleListSessions(webview);
     }
   }
 
@@ -131,6 +150,22 @@ export class MessageRouter {
       payload.requestId?.trim() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const userId = `${requestId}-user`;
     const assistantId = requestId;
+
+    // 1. Establish session immediately before sending user message to UI
+    const sessionId = await this.getPersistSessionId();
+    if (sessionId) {
+      // If we have a session, ensure webview is pinned to it
+      // We don't send the full history here, just the ID sync
+      webview.postMessage({
+        type: "chatHistory",
+        payload: {
+          messages: null,
+          sessionId,
+          workspaceKey: this.chatPersistence.getWorkspaceKey(),
+        },
+      });
+    }
+
     this.assistantStreamAcc.set(assistantId, { content: "", thought: "" });
 
     this.logger.info(
@@ -205,11 +240,17 @@ export class MessageRouter {
     const newUserId = payload.userId || null;
     this.logger.info(`📥 Received setUser message: userId=${newUserId || "NULL"}`);
 
-    // STRICT: We do NOT support anonymous sessions. If userId is missing, we stop here.
     if (!newUserId) {
-      this.logger.info(
-        "👤 User sync: Attempted to set null user. Ignoring to prevent anonymous session creation."
-      );
+      this.logger.info("👤 User logout signal: Clearing session state.");
+      this.currentUserId = null;
+      this.persistedSessionId = null;
+      await this.context.workspaceState.update("currentUserId", null);
+
+      // Clear webview state explicitly
+      webview.postMessage({
+        type: "chatHistory",
+        payload: { messages: [], sessionId: null },
+      });
       return;
     }
 
@@ -221,6 +262,21 @@ export class MessageRouter {
       this.currentUserId = newUserId;
       this.persistedSessionId = null;
       this.logger.info(`👤 User sync confirmed: ${newUserId}`);
+
+      // PROACTIVE: Resolve session immediately upon user set
+      const sessionId = await this.getPersistSessionId();
+      if (sessionId) {
+        this.logger.info(`✅ Proactively synced session ${sessionId} for user ${newUserId}`);
+        webview.postMessage({
+          type: "chatHistory",
+          payload: {
+            messages: null,
+            sessionId,
+            workspaceKey: this.chatPersistence.getWorkspaceKey(),
+          },
+        });
+      }
+
       await this.handleOnReady(webview);
     }
   }
@@ -534,9 +590,7 @@ export class MessageRouter {
     const sessionId = await this.chatPersistence.createNewSession(wk, userId);
     if (sessionId) {
       this.persistedSessionId = sessionId;
-      // Reset webview messages to welcome state
-      webview.postMessage({ type: "resetChat" });
-      // Inform webview of the new session ID
+      // Inform webview of the new session ID and reset messages in one go
       webview.postMessage({
         type: "chatHistory",
         payload: { messages: [], sessionId, workspaceKey: wk },

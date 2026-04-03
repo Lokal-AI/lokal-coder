@@ -18,6 +18,7 @@ export type WebviewCommand =
   | "loadSession"
   | "deleteSession"
   | "createSession"
+  | "clearSession"
   | "openSettings"
   | "revealInExplorer";
 

@@ -1,7 +1,7 @@
+import { Markdown } from "@components/common/Markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Sparkles } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Markdown } from "./common/Markdown";
 
 interface ThoughtProcessProps {
   content: string;

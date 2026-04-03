@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import { ServiceContainer } from "../core/container";
-import { Logger } from "../core/logger";
-import { revealLokalCoderChat } from "./revealChat";
-import { ChatPersistenceService } from "../services/chatPersistenceService";
-import { ChatWebviewProvider } from "../services/webviewProvider";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
+import { revealLokalCoderChat } from "@commands/revealChat";
+import { ChatPersistenceService } from "@chat/chatPersistenceService";
+import { ChatWebviewProvider } from "@webview/webviewProvider";
 
 export function registerCommands(context: vscode.ExtensionContext) {
   const logger = ServiceContainer.getInstance().resolve<Logger>("Logger");
@@ -22,7 +22,9 @@ export function registerCommands(context: vscode.ExtensionContext) {
       if (await persistence.isConfigured()) {
         const wk = persistence.getWorkspaceKey();
         if (wk) {
-          const sid = await persistence.getOrCreateSession(wk);
+          const router = ServiceContainer.getInstance().resolve<any>("MessageRouter");
+          const uid = router.getCurrentUserId();
+          const sid = await persistence.getOrCreateSession(wk, uid);
           if (sid) {
             await persistence.clearMessages(sid);
           }

@@ -1,5 +1,5 @@
+import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { useEffect, useState } from "react";
-import { useVsCodeApi } from "./useVsCodeApi";
 
 interface StreamResult {
   isStreaming: boolean;

@@ -1,9 +1,6 @@
-import * as vscode from "vscode";
 import { OpenAI } from "openai";
-import { ServiceContainer } from "../core/container";
-import { Logger } from "../core/logger";
-
-const DEFAULT_BASE = "http://127.0.0.1:11434/v1";
+import { ServiceContainer } from "@core/container";
+import { Logger } from "@core/logger";
 
 export class OllamaService {
   private client: OpenAI;
@@ -15,9 +12,10 @@ export class OllamaService {
   }
 
   private createClient(): OpenAI {
-    const config = vscode.workspace.getConfiguration("lokal-coder");
-    const baseURL = config.get<string>("apiBaseUrl") || DEFAULT_BASE;
-    const apiKey = config.get<string>("apiKey") || "ollama";
+    const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    const baseURL = config.getOllamaBaseUrl();
+    const apiKey = config.getOllamaApiKey();
+
     this.logger.info(`OpenAI-compatible client baseURL: ${baseURL}`);
     return new OpenAI({
       baseURL,
@@ -32,8 +30,8 @@ export class OllamaService {
 
   /** Ollama model list lives at /api/tags (not under /v1). */
   private getOllamaTagsUrl(): string {
-    const config = vscode.workspace.getConfiguration("lokal-coder");
-    const base = config.get<string>("apiBaseUrl") || DEFAULT_BASE;
+    const config = ServiceContainer.getInstance().resolve<any>("ConfigService");
+    const base = config.getOllamaBaseUrl();
     const root = base.replace(/\/?v1\/?$/i, "").replace(/\/$/, "");
     return `${root}/api/tags`;
   }

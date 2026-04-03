@@ -9,6 +9,14 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@core/*": ["src/core/*"],
+      "@config/*": ["src/services/config/*"],
+      "@llms/*": ["src/services/llms/*"],
+      "@file-service/*": ["src/services/file-service/*"],
+      "@chat/*": ["src/services/chat/*"],
+      "@webview/*": ["src/services/webview/*"],
+      "@commands/*": ["src/commands/*"],
+      "@lokal-types/*": ["src/types/*"],
       "@/*": ["src/*"]
     },
     "esModuleInterop": true,

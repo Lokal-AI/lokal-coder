@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Logger } from "../core/logger";
+import { Logger } from "@core/logger";
 
 export interface ActiveContext {
   fileName?: string;

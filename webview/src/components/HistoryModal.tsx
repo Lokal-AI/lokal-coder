@@ -1,7 +1,7 @@
+import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clock, MessageSquare, Search, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import { useVsCodeApi } from "../hooks/useVsCodeApi";
 
 interface ChatSession {
   id: string;
