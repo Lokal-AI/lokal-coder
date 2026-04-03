@@ -7,7 +7,17 @@ import { ThoughtProcess } from "@components/ThoughtProcess";
 import { useSession } from "@contexts/SessionContext";
 import { useVsCodeApi } from "@hooks/useVsCodeApi";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Bot, Clock, LogOut, Plus, RotateCcw, Settings } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  Clock,
+  File,
+  Folder,
+  LogOut,
+  Plus,
+  RotateCcw,
+  Settings,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function App() {
@@ -206,7 +216,7 @@ export default function App() {
                     msg.role === "assistant"
                       ? "w-full py-1"
                       : msg.role === "user"
-                        ? "p-3 rounded-2xl border max-w-[85%] bg-sky-500/10 border-sky-500/20"
+                        ? "px-3 py-2 rounded-2xl max-w-[85%] bg-[var(--chat-user-bg)] shadow-sm"
                         : "p-3 rounded-2xl border w-full bg-red-500/5 border-red-500/10 text-[11px] font-mono"
                   }`}
                 >
@@ -216,6 +226,33 @@ export default function App() {
                       <ActivityTimeline items={msg.activities || []} streaming={!!msg.isThinking} />
                     </div>
                   )}
+
+                  {msg.role === "user" && msg.mentions && msg.mentions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {msg.mentions.map((mention) => (
+                        <div
+                          key={mention.id}
+                          onClick={() =>
+                            mention.type === "file" &&
+                            vscode.postMessage({
+                              command: "openFile",
+                              payload: { path: mention.relativePath || mention.name },
+                            })
+                          }
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.05] transition-colors text-[9px] font-bold text-slate-400
+                            ${mention.type === "file" ? "cursor-pointer hover:bg-white/[0.1] hover:text-sky-400" : "cursor-default"}`}
+                        >
+                          {mention.type === "file" ? (
+                            <File size={10} className="text-sky-500/80" />
+                          ) : (
+                            <Folder size={10} className="text-amber-500/80" />
+                          )}
+                          <span className="truncate max-w-[120px]">{mention.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="text-[12.5px] leading-relaxed font-medium text-slate-200">
                     <Markdown content={msg.content} />
                   </div>
