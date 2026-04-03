@@ -233,7 +233,7 @@ export function InputDock() {
       selectionInProgressRef.current = false;
     }
 
-    setSelectedMentions((prev) => {
+    setSelectedMentions((prev: MentionItem[]) => {
       if (prev.some((m) => m.id === item.id)) return prev;
       return [...prev, item];
     });
@@ -370,7 +370,9 @@ export function InputDock() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedMentions((prev) => prev.filter((m) => m.id !== mention.id));
+                    setSelectedMentions((prev: MentionItem[]) =>
+                      prev.filter((m) => m.id !== mention.id)
+                    );
                   }}
                   className="p-0.5 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
                 >

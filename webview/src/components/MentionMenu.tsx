@@ -56,7 +56,12 @@ function MentionMenuInner({
   setCurrentCategory,
   selectedIndex,
   setSelectedIndex,
-}: any) {
+}: MentionMenuProps & {
+  currentCategory: string | null;
+  setCurrentCategory: (cat: string | null) => void;
+  selectedIndex: number;
+  setSelectedIndex: (idx: number) => void;
+}) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuW = 240;
   const menuMaxH = 340;

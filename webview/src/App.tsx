@@ -57,7 +57,7 @@ export default function App() {
 
       switch (message.type) {
         case "updateMessages":
-          setMessages((prev) => [...prev, message.payload]);
+          setMessages((prev: Message[]) => [...prev, message.payload]);
           break;
 
         case "chatHistory": {
@@ -84,7 +84,7 @@ export default function App() {
           break;
 
         case "thoughtChunk":
-          setMessages((prev) => {
+          setMessages((prev: Message[]) => {
             const last = prev[prev.length - 1];
             if (last && last.role === "assistant" && last.id === message.id) {
               return [
@@ -106,7 +106,7 @@ export default function App() {
           break;
 
         case "streamChunk":
-          setMessages((prev) => {
+          setMessages((prev: Message[]) => {
             const last = prev[prev.length - 1];
             if (last && last.role === "assistant" && last.id === message.id) {
               return [
@@ -122,7 +122,7 @@ export default function App() {
           break;
 
         case "streamEnd":
-          setMessages((prev) => {
+          setMessages((prev: Message[]) => {
             const last = prev[prev.length - 1];
             if (last && last.role === "assistant" && last.id === message.id) {
               // Optionally persist turn here or on the backend
@@ -132,7 +132,7 @@ export default function App() {
           break;
 
         case "streamError":
-          setMessages((prev) => [
+          setMessages((prev: Message[]) => [
             ...prev,
             { id: message.id || Date.now(), role: "system", content: `Error: ${message.payload}` },
           ]);
